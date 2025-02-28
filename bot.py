@@ -27,7 +27,7 @@ async def get_ai_response(message, is_flood=False):
 
 @client.event
 async def on_ready():
-    print(f'Бот {client.user} запущен, пиздец!')
+    print("Auto push test successful")
 
 @client.event
 async def on_message(message):
