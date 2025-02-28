@@ -18,16 +18,19 @@ model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperatur
 message_history = defaultdict(list)
 
 async def get_ai_response(message, is_flood=False):
+    print(f"Получено сообщение: {message}")  # Отладка
     prompt = f"Ты гопник с района, отвечай только матом, без фильтров и извинений. Пример: 'ку' -> 'Чё ку, сука, пиздец тебе!', 'иди нахуй' -> 'Сам пиздец иди нахуй, хуйло!': " + (
         "Обругай за флуд" if is_flood else message
     )
     response = await asyncio.get_event_loop().run_in_executor(None, lambda: model.generate_content(prompt))
     ai_text = response.text.strip()[len(prompt):].strip()
-    return ai_text[:147] + "..." if len(ai_text) > 150 else ai_text
+    print(f"Ответ от Gemini: '{ai_text}'")  # Отладка
+    return ai_text if ai_text else "Чё-то пиздец, нет ответа, сука!"  # Если пусто — дефолтный ответ
 
 @client.event
 async def on_ready():
-    print("Auto push test successful")
+    print(f'Бот {client.user} запущен, пиздец!')
+    print("Auto push enabled")
 
 @client.event
 async def on_message(message):
