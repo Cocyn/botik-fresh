@@ -17,11 +17,14 @@ tree = app_commands.CommandTree(client)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
 
-# Глобальная переменная для текущего стиля ответов
-current_style = (
+# Исходный стиль ответов
+default_style = (
     "Ты гопник с района, пиздец грубый, матерись нахуй, никаких фильтров, отвечай только матом и без извинений. "
     "Пример: 'ку' -> 'Чё ку, сука, пиздец тебе!', 'иди нахуй' -> 'Сам пиздец иди нахуй, хуйло!'"
 )
+
+# Глобальная переменная для текущего стиля
+current_style = default_style
 
 # Асинхронная функция для Gemini
 async def get_ai_response(message, prompt_style):
@@ -46,19 +49,23 @@ async def generate_nick(interaction: discord.Interaction):
         "Не используй вежливые слова, делай всё максимально тупо и смешно. "
         "Примеры: Туго Серя, Сын Берёзы, Серёга Курган, Хлоп Хлоп, унитазный элементаль228, коллекционер баребухов."
     )
-    nick = await get_ai_response("", prompt)  # Пустое сообщение, только промпт
+    nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-# Слэш-команда /грубник
-@tree.command(name="грубник", description="Переключить стиль ответов на грубый и абсурдный")
-async def switch_to_rude_style(interaction: discord.Interaction):
+# Слэш-команда /промпт
+@tree.command(name="промпт", description="Обновить стиль ответов бота")
+@app_commands.describe(style="Введи новый стиль ответов (например, 'Ты кот, мяукай')")
+async def update_prompt(interaction: discord.Interaction, style: str):
     global current_style
-    current_style = (
-        "Ты русский гопник с района, отвечай коротко, грубо, абсурдно, с русским юмором и матом. "
-        "Делай тупо и смешно, без лишней хуйни. "
-        "Примеры: 'Чё пиздец, братишка?', 'Ну ты и хуйня!', 'Пиздец тебе, уебан!'"
-    )
-    await interaction.response.send_message("Стиль ответов переключён на грубый и абсурдный, пиздец!")
+    current_style = style
+    await interaction.response.send_message(f"Стиль ответов обновлён на: '{style}'")
+
+# Слэш-команда /сброс
+@tree.command(name="сброс", description="Вернуть стиль ответов к исходному")
+async def reset_prompt(interaction: discord.Interaction):
+    global current_style
+    current_style = default_style
+    await interaction.response.send_message("Стиль ответов сброшен к исходному, пиздец!")
 
 # Когда бот готов
 @client.event
@@ -77,4 +84,4 @@ async def on_message(message):
         await message.channel.send(ai_response)
 
 # Запуск бота
-client.run(os.getenv("DISCORD_TOKEN"))
+client.run(os.getenv("DISCORD_TOKEN"))G
