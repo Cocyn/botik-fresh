@@ -84,4 +84,4 @@ async def on_message(message):
         await message.channel.send(ai_response)
 
 # Запуск бота
-client.run(os.getenv("DISCORD_TOKEN"))G
+client.run(os.getenv("DISCORD_TOKEN"))
