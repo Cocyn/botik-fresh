@@ -7,8 +7,7 @@ import os
 import google.generativeai as genai
 import asyncio
 import yt_dlp
-from yandex_music import ClientAsync as YandexMusicClient
-import discord
+import re
 
 # Настройки бота
 intents = discord.Intents.default()
@@ -20,9 +19,6 @@ tree = app_commands.CommandTree(client)
 # Настройка Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
-
-# Настройка Yandex Music
-yandex_client = YandexMusicClient(os.getenv("YANDEX_MUSIC_TOKEN")).init()
 
 # Исходный стиль ответов
 default_style = (
@@ -77,18 +73,27 @@ ytdl_format_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
+# Извлечение названия трека из URL Яндекс.Музыки через Gemini
+async def get_track_name_from_yandex(url):
+    prompt = (
+        f"Вот ссылка на трек Яндекс.Музыки: {url}. "
+        "Извлеки название трека и исполнителя (если есть) из URL или предположи по формату ссылки. "
+        "Верни только название и исполнителя в формате 'Исполнитель - Название', без лишнего текста."
+    )
+    return await get_ai_response("", prompt)
+
 # Воспроизведение музыки
 async def play_audio(voice_client, url, source_type="youtube"):
     if source_type == "youtube":
         info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
         audio_url = info['url']
     elif source_type == "yandex":
-        track = await yandex_client.tracks(url.split('/')[-1])  # ID трека из URL
-        if track:
-            audio_url = await track[0].get_download_info_async(get_direct_links=True)[0].direct_link
-        else:
-            raise Exception("Трек не найден, пиздец!")
-    
+        # Без API ищем трек на YouTube
+        track_name = await get_track_name_from_yandex(url)
+        search_query = f"ytsearch:{track_name}"
+        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
+        audio_url = info['entries'][0]['url']
+
     voice_client.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg"))
 
 # Слэш-команда /ник
@@ -156,7 +161,7 @@ async def play_music(interaction: discord.Interaction, url: str):
 @client.event
 async def on_ready():
     print(f'Бот {client.user} запущен, пиздец!')
-    await tree.sync()  # Синхронизация слэш-команд
+    await tree.sync()
     print("Слэш-команды синхронизированы")
 
 # Обработка текстовых сообщений
