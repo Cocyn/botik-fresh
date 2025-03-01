@@ -12,6 +12,7 @@ from functools import lru_cache
 # Константы
 ALLOWED_MUSIC_CHANNELS = {1345015845033607322, 1336347510289076257}
 YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True}
+GUILD_ID = 1345015845033607322  # Твой сервер с друзьями
 
 # Логирование
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
@@ -82,7 +83,7 @@ async def get_ai_response(message, prompt_style):
         ai_text = response.text.strip()
         if ai_text.startswith(prompt):
             ai_text = ai_text[len(prompt):].strip()
-        if len(ai_text) > 200:  # Вернул лимит 200 символов
+        if len(ai_text) > 200:
             ai_text = ai_text[:197] + "..."
         logger.info(f"Ответ: {ai_text}")
         return ai_text or "Чё-то хуйня вышла, нет ответа!"
@@ -108,13 +109,13 @@ async def get_track_name_from_yandex(url):
     prompt = f"Ссылка Яндекс.Музыки: {url}. Дай 'Исполнитель - Название'."
     return await get_ai_response("", prompt)
 
-@client.slash_command(name="ник", description="Дерзкий ник")
+@client.slash_command(name="ник", description="Дерзкий ник", guild=discord.Object(id=GUILD_ID))
 async def generate_nick(interaction: nextcord.Interaction):
     prompt = "Придумай короткий, дерзкий и смешной русский ник с уличным вайбом. Примеры: Туго Серя, Хлоп Хлоп."
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-@client.slash_command(name="play", description="Трек с YouTube/Яндекс")
+@client.slash_command(name="play", description="Трек с YouTube/Яндекс", guild=discord.Object(id=GUILD_ID))
 async def play(interaction: nextcord.Interaction, url: str):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел, ты не в теме?")
@@ -140,7 +141,7 @@ async def play(interaction: nextcord.Interaction, url: str):
     else:
         await interaction.response.send_message(f"В очередь: {url}")
 
-@client.slash_command(name="stop", description="Стоп музыка")
+@client.slash_command(name="stop", description="Стоп музыка", guild=discord.Object(id=GUILD_ID))
 async def stop(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел?")
@@ -154,7 +155,7 @@ async def stop(interaction: nextcord.Interaction):
     else:
         await interaction.response.send_message("Тишина и так, чё ныть?")
 
-@client.slash_command(name="skip", description="Скип трек")
+@client.slash_command(name="skip", description="Скип трек", guild=discord.Object(id=GUILD_ID))
 async def skip(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел?")
@@ -167,7 +168,7 @@ async def skip(interaction: nextcord.Interaction):
     else:
         await interaction.response.send_message("Скипать нечего!")
 
-@client.slash_command(name="pcat", description="Стиль из категорий")
+@client.slash_command(name="pcat", description="Стиль из категорий", guild=discord.Object(id=GUILD_ID))
 async def prompt_categories(interaction: nextcord.Interaction, category: str):
     global current_style
     category = category.lower()
@@ -177,13 +178,13 @@ async def prompt_categories(interaction: nextcord.Interaction, category: str):
     else:
         await interaction.response.send_message(f"Нет такого: {', '.join(prompt_categories.keys())}")
 
-@client.slash_command(name="preset", description="Сброс стиля")
+@client.slash_command(name="preset", description="Сброс стиля", guild=discord.Object(id=GUILD_ID))
 async def prompt_reset(interaction: nextcord.Interaction):
     global current_style
     current_style = default_style
     await interaction.response.send_message("Сбросил на мой вайб!")
 
-@client.slash_command(name="pcust", description="Свой стиль")
+@client.slash_command(name="pcust", description="Свой стиль", guild=discord.Object(id=GUILD_ID))
 async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
     global current_style
     if not prompt:
@@ -192,7 +193,12 @@ async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
     current_style = prompt
     await interaction.response.send_message(f"Стиль: {prompt}, годно!")
 
-@client.slash_command(name="help", description="Список команд")
+@client.slash_command(name="sync", description="Синхронизировать команды", guild=discord.Object(id=GUILD_ID))
+async def sync(interaction: nextcord.Interaction):
+    await client.sync_all_application_commands()
+    await interaction.response.send_message("Команды синхронизированы, чел!")
+
+@client.slash_command(name="help", description="Список команд", guild=discord.Object(id=GUILD_ID))
 async def help(interaction: nextcord.Interaction):
     commands = (
         "/ник - Дерзкий ник\n"
@@ -202,11 +208,12 @@ async def help(interaction: nextcord.Interaction):
         "/pcat <category> - Стиль из категорий\n"
         "/preset - Сброс стиля\n"
         "/pcust <prompt> - Свой стиль\n"
+        "/sync - Синхронизация команд\n"
         "/help - Этот список"
     )
     await interaction.response.send_message(f"Чё умею:\n{commands}")
 
-@client.slash_command(name="status", description="Статус бота")
+@client.slash_command(name="status", description="Статус бота", guild=discord.Object(id=GUILD_ID))
 async def status(interaction: nextcord.Interaction):
     queue = f"Очередь: {len(music_queue)} треков" if music_queue else "Очередь пуста"
     style = f"Стиль: {current_style[:30]}..." if len(current_style) > 30 else f"Стиль: {current_style}"
@@ -215,7 +222,7 @@ async def status(interaction: nextcord.Interaction):
 @client.event
 async def on_ready():
     logger.info(f'Бот {client.user} запущен!')
-    logger.info("Слэш-команды готовы")
+    logger.info("Слэш-команды готовы, используй /sync для обновления")
 
 @client.event
 async def on_message(message):
