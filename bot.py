@@ -12,7 +12,7 @@ from functools import lru_cache
 # Константы
 ALLOWED_MUSIC_CHANNELS = {1345015845033607322, 1336347510289076257}
 YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True}
-GUILD_ID = 1336347509680766978  # Твой сервер с друзьями
+GUILD_ID = 1336347509680766978  # Твой сервер P4P
 
 # Логирование
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
@@ -196,6 +196,7 @@ async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
 @client.slash_command(name="sync", description="Синхронизировать команды", guild=discord.Object(id=GUILD_ID))
 async def sync(interaction: nextcord.Interaction):
     await client.sync_all_application_commands()
+    logger.info("Команды синхронизированы для сервера P4P")
     await interaction.response.send_message("Команды синхронизированы, чел!")
 
 @client.slash_command(name="help", description="Список команд", guild=discord.Object(id=GUILD_ID))
