@@ -190,6 +190,16 @@ async def prompt_reset(interaction: nextcord.Interaction):
     current_style = default_style
     await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
 
+# Слэш-команда /prompt_custom
+@client.slash_command(name="prompt_custom", description="Установить свой стиль ответов")
+async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
+    global current_style
+    if not prompt:
+        await interaction.response.send_message("Дай свой промпт, сука!")
+        return
+    current_style = prompt
+    await interaction.response.send_message(f"Теперь я отвечаю в стиле: '{prompt}', пиздец круто!")
+
 @client.event
 async def on_ready():
     print(f'Бот {client.user} запущен, пиздец!')
