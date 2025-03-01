@@ -2,13 +2,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import nextcord
-from nextcord import app_commands
 import os
 import google.generativeai as genai
 import asyncio
 import yt_dlp
 
-# Проверяем версию nextcord
 print(f"Nextcord version: {nextcord.__version__}")
 
 # Настройки бота
@@ -16,7 +14,6 @@ intents = nextcord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 client = nextcord.Client(intents=intents)
-tree = app_commands.CommandTree(client)
 
 # Настройка Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -100,7 +97,7 @@ async def get_track_name_from_yandex(url):
     return await get_ai_response("", prompt)
 
 # Слэш-команда /ник
-@tree.command(name="ник", description="Сгенерировать грубый русский ник")
+@client.slash_command(name="ник", description="Сгенерировать грубый русский ник")
 async def generate_nick(interaction: nextcord.Interaction):
     prompt = (
         "Ты русский гопник с района, придумай мне один короткий, грубый ник с абсурдным юмором и русским колоритом. "
@@ -110,100 +107,94 @@ async def generate_nick(interaction: nextcord.Interaction):
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-# Группа команд /play
-play_group = app_commands.Group(name="play", description="Управление музыкальным плеером")
-
-@play_group.command(name="track", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
-@app_commands.describe(url="Ссылка на трек (YouTube или Яндекс.Музыка)")
-async def play_track(interaction: nextcord.Interaction, url: str):
+# Объединённая команда /play
+@client.slash_command(name="play", description="Управление музыкальным плеером")
+async def play(interaction: nextcord.Interaction, action: str, url: str = None):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
 
-    if not interaction.user.voice:
-        await interaction.response.send_message("Ты не в голосовом канале, сука!")
-        return
-
-    voice_channel = interaction.user.voice.channel
-    try:
-        voice_client = await voice_channel.connect()
-    except nextcord.ClientException:
-        voice_client = interaction.guild.voice_client
-
-    if "youtube.com" in url or "youtu.be" in url:
-        source_type = "youtube"
-    elif "music.yandex" in url:
-        source_type = "yandex"
-        track_name = await get_track_name_from_yandex(url)
-        url = f"ytsearch:{track_name}"
-    else:
-        await interaction.response.send_message("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
-        return
-
-    music_queue.append((url, source_type))
-    if not voice_client.is_playing():
-        await play_next(voice_client, interaction)
-    else:
-        await interaction.response.send_message(f"Добавлено в очередь: {url}")
-
-@play_group.command(name="stop", description="Остановить музыку и отключиться")
-async def play_stop(interaction: nextcord.Interaction):
-    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
-        return
-
+    action = action.lower()
     voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.stop()
-        await voice_client.disconnect()
-        music_queue.clear()
-        await interaction.response.send_message("Музыка стоп, пиздец, отключился!")
+
+    if action == "track":
+        if not url:
+            await interaction.response.send_message("Дай ссыль на трек, сука!")
+            return
+        if not interaction.user.voice:
+            await interaction.response.send_message("Ты не в голосовом канале, сука!")
+            return
+
+        voice_channel = interaction.user.voice.channel
+        try:
+            voice_client = await voice_channel.connect()
+        except nextcord.ClientException:
+            voice_client = interaction.guild.voice_client
+
+        if "youtube.com" in url or "youtu.be" in url:
+            source_type = "youtube"
+        elif "music.yandex" in url:
+            source_type = "yandex"
+            track_name = await get_track_name_from_yandex(url)
+            url = f"ytsearch:{track_name}"
+        else:
+            await interaction.response.send_message("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
+            return
+
+        music_queue.append((url, source_type))
+        if not voice_client.is_playing():
+            await play_next(voice_client, interaction)
+        else:
+            await interaction.response.send_message(f"Добавлено в очередь: {url}")
+
+    elif action == "stop":
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
+            await voice_client.disconnect()
+            music_queue.clear()
+            await interaction.response.send_message("Музыка стоп, пиздец, отключился!")
+        else:
+            await interaction.response.send_message("Ниче не играет, сука!")
+
+    elif action == "skip":
+        if voice_client and voice_client.is_playing():
+            voice_client.stop()
+            await interaction.response.send_message("Трек скипнут, пиздец!")
+            await play_next(voice_client, interaction)
+        else:
+            await interaction.response.send_message("Ниче не играет, сука!")
     else:
-        await interaction.response.send_message("Ниче не играет, сука!")
+        await interaction.response.send_message("Такого действия нет, сука! Используй: track, stop, skip")
 
-@play_group.command(name="skip", description="Пропустить текущий трек")
-async def play_skip(interaction: nextcord.Interaction):
-    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
-        return
-
-    voice_client = interaction.guild.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.stop()
-        await interaction.response.send_message("Трек скипнут, пиздец!")
-        await play_next(voice_client, interaction)
-    else:
-        await interaction.response.send_message("Ниче не играет, сука!")
-
-# Группа команд /prompt
-prompt_group = app_commands.Group(name="prompt", description="Настройка стилей ответов бота")
-
-@prompt_group.command(name="categories", description="Выбрать стиль ответов из категорий")
-@app_commands.describe(category="Категория: матные, унизительные, абсурдные, кот")
-async def prompt_categories(interaction: nextcord.Interaction, category: str):
+# Объединённая команда /prompt
+@client.slash_command(name="prompt", description="Настройка стилей ответов бота")
+async def prompt(interaction: nextcord.Interaction, action: str, category: str = None):
     global current_style
-    category = category.lower()
-    if category in prompt_categories:
-        current_style = prompt_categories[category]
-        await interaction.response.send_message(f"Стиль ответов теперь '{category}', пиздец круто!")
+    action = action.lower()
+
+    if action == "categories":
+        if not category:
+            await interaction.response.send_message("Укажи категорию, сука! Доступны: матные, унизительные, абсурдные, кот")
+            return
+        category = category.lower()
+        if category in prompt_categories:
+            current_style = prompt_categories[category]
+            await interaction.response.send_message(f"Стиль ответов теперь '{category}', пиздец круто!")
+        else:
+            categories_list = ", ".join(prompt_categories.keys())
+            await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
+
+    elif action == "reset":
+        current_style = default_style
+        await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
     else:
-        categories_list = ", ".join(prompt_categories.keys())
-        await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
+        await interaction.response.send_message("Такого действия нет, сука! Используй: categories, reset")
 
-@prompt_group.command(name="reset", description="Вернуть стиль ответов к исходному гопнику")
-async def prompt_reset(interaction: nextcord.Interaction):
-    global current_style
-    current_style = default_style
-    await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
-
-# Когда бот готов
 @client.event
 async def on_ready():
     print(f'Бот {client.user} запущен, пиздец!')
-    await tree.sync()
     print("Слэш-команды синхронизированы")
 
-# Обработка текстовых сообщений
 @client.event
 async def on_message(message):
     if message.author == client.user or message.author.bot:
@@ -212,5 +203,4 @@ async def on_message(message):
         ai_response = await get_ai_response(message.content, current_style)
         await message.channel.send(ai_response)
 
-# Запуск бота
 client.run(os.getenv("DISCORD_TOKEN"))
