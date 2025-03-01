@@ -12,7 +12,7 @@ from functools import lru_cache
 # Константы
 ALLOWED_MUSIC_CHANNELS = {1345015845033607322, 1336347510289076257}
 YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True}
-GUILD_ID = 1345015845033607322  # Твой сервер с друзьями
+GUILD_ID = 1336347509680766978  # Твой сервер с друзьями
 
 # Логирование
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
