@@ -1,4 +1,4 @@
-nextcord[voice]
+nextcord[voice]>=2.6.0
 python-dotenv
 google-generativeai
 yt-dlp

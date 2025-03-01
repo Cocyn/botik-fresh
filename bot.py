@@ -48,7 +48,7 @@ prompt_categories = {
 # Глобальные переменные
 current_style = default_style
 music_queue = []
-ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 123456789012345678]  # "тест" и "музыка" (замени ID "музыка")
+ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 1336347510289076257]  # "тест" и "музыка"
 
 # Асинхронная функция для Gemini
 async def get_ai_response(message, prompt_style):
@@ -87,7 +87,7 @@ async def play_next(voice_client, interaction):
         await interaction.followup.send("Очередь пуста, пиздец!")
         await voice_client.disconnect()
 
-# Извлечение названия трека из URL Яндекс.Музыки через Gemini
+# Извлечение названия трека из URL Яндекс.Музыки
 async def get_track_name_from_yandex(url):
     prompt = (
         f"Вот ссылка на трек Яндекс.Музыки: {url}. "
@@ -187,9 +187,8 @@ async def prompt_categories(interaction: nextcord.Interaction, category: str):
         categories_list = ", ".join(prompt_categories.keys())
         await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
 
-# Слэш-команда /сброс
-@tree.command(name="сброс", description="Вернуть стиль ответов к исходному гопнику")
-async def reset_prompt(interaction: nextcord.Interaction):
+@prompt_group.command(name="reset", description="Вернуть стиль ответов к исходному гопнику")
+async def prompt_reset(interaction: nextcord.Interaction):
     global current_style
     current_style = default_style
     await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
