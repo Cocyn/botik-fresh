@@ -8,6 +8,9 @@ import google.generativeai as genai
 import asyncio
 import yt_dlp
 
+# Проверяем версию nextcord
+print(f"Nextcord version: {nextcord.__version__}")
+
 # Настройки бота
 intents = nextcord.Intents.default()
 intents.message_content = True
@@ -54,7 +57,7 @@ ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 1336347510289076257]  # "тест
 async def get_ai_response(message, prompt_style):
     try:
         prompt = f"{prompt_style}: {message}"
-        response = await asyncio.get_running_loop().run_in_executor(None, lambda: model.generate_content(prompt))
+        response = await asyncio.get_event_loop().run_in_executor(None, lambda: model.generate_content(prompt))
         ai_text = response.text.strip()
         if ai_text.startswith(prompt):
             ai_text = ai_text[len(prompt):].strip()
@@ -78,7 +81,7 @@ ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 async def play_next(voice_client, interaction):
     if music_queue:
         url, source_type = music_queue.pop(0)
-        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+        info = await asyncio.get_event_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
         audio_url = info['url'] if source_type == "youtube" else info['entries'][0]['url']
 
         voice_client.play(nextcord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
@@ -87,7 +90,7 @@ async def play_next(voice_client, interaction):
         await interaction.followup.send("Очередь пуста, пиздец!")
         await voice_client.disconnect()
 
-# Извлечение названия трека из URL Яндекс.Музыки
+# Извлечение названия трека из Яндекс.Музыки
 async def get_track_name_from_yandex(url):
     prompt = (
         f"Вот ссылка на трек Яндекс.Музыки: {url}. "
