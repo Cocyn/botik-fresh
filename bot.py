@@ -1,18 +1,18 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import discord
-from discord import app_commands
+import nextcord
+from nextcord import app_commands
 import os
 import google.generativeai as genai
 import asyncio
 import yt_dlp
 
 # Настройки бота
-intents = discord.Intents.default()
+intents = nextcord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
-client = discord.Client(intents=intents)
+client = nextcord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
 # Настройка Gemini
@@ -81,7 +81,7 @@ async def play_next(voice_client, interaction):
         info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
         audio_url = info['url'] if source_type == "youtube" else info['entries'][0]['url']
 
-        voice_client.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
+        voice_client.play(nextcord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
         await interaction.followup.send(f"Ща играет: {url}")
     else:
         await interaction.followup.send("Очередь пуста, пиздец!")
@@ -98,7 +98,7 @@ async def get_track_name_from_yandex(url):
 
 # Слэш-команда /ник
 @tree.command(name="ник", description="Сгенерировать грубый русский ник")
-async def generate_nick(interaction: discord.Interaction):
+async def generate_nick(interaction: nextcord.Interaction):
     prompt = (
         "Ты русский гопник с района, придумай мне один короткий, грубый ник с абсурдным юмором и русским колоритом. "
         "Не используй вежливые слова, делай всё максимально тупо и смешно. "
@@ -112,7 +112,7 @@ play_group = app_commands.Group(name="play", description="Управление �
 
 @play_group.command(name="track", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
 @app_commands.describe(url="Ссылка на трек (YouTube или Яндекс.Музыка)")
-async def play_track(interaction: discord.Interaction, url: str):
+async def play_track(interaction: nextcord.Interaction, url: str):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -124,7 +124,7 @@ async def play_track(interaction: discord.Interaction, url: str):
     voice_channel = interaction.user.voice.channel
     try:
         voice_client = await voice_channel.connect()
-    except discord.ClientException:
+    except nextcord.ClientException:
         voice_client = interaction.guild.voice_client
 
     if "youtube.com" in url or "youtu.be" in url:
@@ -144,7 +144,7 @@ async def play_track(interaction: discord.Interaction, url: str):
         await interaction.response.send_message(f"Добавлено в очередь: {url}")
 
 @play_group.command(name="stop", description="Остановить музыку и отключиться")
-async def play_stop(interaction: discord.Interaction):
+async def play_stop(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -159,7 +159,7 @@ async def play_stop(interaction: discord.Interaction):
         await interaction.response.send_message("Ниче не играет, сука!")
 
 @play_group.command(name="skip", description="Пропустить текущий трек")
-async def play_skip(interaction: discord.Interaction):
+async def play_skip(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -177,7 +177,7 @@ prompt_group = app_commands.Group(name="prompt", description="Настройка
 
 @prompt_group.command(name="categories", description="Выбрать стиль ответов из категорий")
 @app_commands.describe(category="Категория: матные, унизительные, абсурдные, кот")
-async def prompt_categories(interaction: discord.Interaction, category: str):
+async def prompt_categories(interaction: nextcord.Interaction, category: str):
     global current_style
     category = category.lower()
     if category in prompt_categories:
@@ -189,7 +189,7 @@ async def prompt_categories(interaction: discord.Interaction, category: str):
 
 # Слэш-команда /сброс
 @tree.command(name="сброс", description="Вернуть стиль ответов к исходному гопнику")
-async def reset_prompt(interaction: discord.Interaction):
+async def reset_prompt(interaction: nextcord.Interaction):
     global current_style
     current_style = default_style
     await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
