@@ -7,7 +7,6 @@ import os
 import google.generativeai as genai
 import asyncio
 import yt_dlp
-import re
 
 # Настройки бота
 intents = discord.Intents.default()
@@ -46,8 +45,10 @@ prompt_categories = {
     )
 }
 
-# Глобальная переменная для текущего стиля
+# Глобальные переменные
 current_style = default_style
+music_queue = []
+ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 1336347510289076257]  # "тест" и "музыка" (замени ID "музыка")
 
 # Асинхронная функция для Gemini
 async def get_ai_response(message, prompt_style):
@@ -73,6 +74,19 @@ ytdl_format_options = {
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
+# Воспроизведение следующего трека
+async def play_next(voice_client, interaction):
+    if music_queue:
+        url, source_type = music_queue.pop(0)
+        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+        audio_url = info['url'] if source_type == "youtube" else info['entries'][0]['url']
+
+        voice_client.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
+        await interaction.followup.send(f"Ща играет: {url}")
+    else:
+        await interaction.followup.send("Очередь пуста, пиздец!")
+        await voice_client.disconnect()
+
 # Извлечение названия трека из URL Яндекс.Музыки через Gemini
 async def get_track_name_from_yandex(url):
     prompt = (
@@ -81,20 +95,6 @@ async def get_track_name_from_yandex(url):
         "Верни только название и исполнителя в формате 'Исполнитель - Название', без лишнего текста."
     )
     return await get_ai_response("", prompt)
-
-# Воспроизведение музыки
-async def play_audio(voice_client, url, source_type="youtube"):
-    if source_type == "youtube":
-        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
-        audio_url = info['url']
-    elif source_type == "yandex":
-        # Без API ищем трек на YouTube
-        track_name = await get_track_name_from_yandex(url)
-        search_query = f"ytsearch:{track_name}"
-        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
-        audio_url = info['entries'][0]['url']
-
-    voice_client.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg"))
 
 # Слэш-команда /ник
 @tree.command(name="ник", description="Сгенерировать грубый русский ник")
@@ -131,31 +131,66 @@ async def reset_prompt(interaction: discord.Interaction):
 @tree.command(name="play", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
 @app_commands.describe(url="Ссылка на трек (YouTube или Яндекс.Музыка)")
 async def play_music(interaction: discord.Interaction, url: str):
+    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
+        return
+
     if not interaction.user.voice:
         await interaction.response.send_message("Ты не в голосовом канале, сука!")
         return
-    
+
     voice_channel = interaction.user.voice.channel
     try:
         voice_client = await voice_channel.connect()
     except discord.ClientException:
         voice_client = interaction.guild.voice_client
 
-    await interaction.response.send_message(f"Ща заиграет: {url}")
-    
     if "youtube.com" in url or "youtu.be" in url:
         source_type = "youtube"
     elif "music.yandex" in url:
         source_type = "yandex"
+        track_name = await get_track_name_from_yandex(url)
+        url = f"ytsearch:{track_name}"
     else:
-        await interaction.followup.send("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
+        await interaction.response.send_message("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
         return
 
-    try:
-        await play_audio(voice_client, url, source_type)
-    except Exception as e:
-        await interaction.followup.send(f"Пиздец, не могу заиграть: {str(e)}")
+    music_queue.append((url, source_type))
+    if not voice_client.is_playing():
+        await play_next(voice_client, interaction)
+    else:
+        await interaction.response.send_message(f"Добавлено в очередь: {url}")
+
+# Слэш-команда /stop
+@tree.command(name="stop", description="Остановить музыку и отключиться")
+async def stop_music(interaction: discord.Interaction):
+    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
+        return
+
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
         await voice_client.disconnect()
+        music_queue.clear()
+        await interaction.response.send_message("Музыка стоп, пиздец, отключился!")
+    else:
+        await interaction.response.send_message("Ниче не играет, сука!")
+
+# Слэш-команда /skip
+@tree.command(name="skip", description="Пропустить текущий трек")
+async def skip_music(interaction: discord.Interaction):
+    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
+        return
+
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        await interaction.response.send_message("Трек скипнут, пиздец!")
+        await play_next(voice_client, interaction)
+    else:
+        await interaction.response.send_message("Ниче не играет, сука!")
 
 # Когда бот готов
 @client.event
