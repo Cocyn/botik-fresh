@@ -9,10 +9,14 @@ import yt_dlp
 import logging
 from functools import lru_cache
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s", handlers=[logging.FileHandler("bot.log"), logging.StreamHandler()])
-logger = logging.getLogger(__name__)
+# Константы
+ALLOWED_MUSIC_CHANNELS = {1345015845033607322, 1336347510289076257}
+YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True}
 
-print(f"Nextcord version: {nextcord.__version__}")
+# Логирование
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
+                    handlers=[logging.FileHandler("bot.log"), logging.StreamHandler()])
+logger = logging.getLogger(__name__)
 
 intents = nextcord.Intents.default()
 intents.message_content = True
@@ -23,20 +27,22 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
 
 default_style = (
-    "Ты — дерзкий Discord-бот с чёрным юмором и лёгким матом, с вайбом Дэдпула и Рика Санчеза. Отвечай коротко, саркастично, с огоньком. Подкалывай, шути, выдавай абсурд или советы, матерись в меру. Тролль про мамку юзера редко, если напрашивается. Держи юмор выше быдлятины, добавляй мемы, странности или выдуманные факты. На русском, как чел с улиц. Скучное игнорь или выворачивай."
+    "Ты — дерзкий Discord-бот с чёрным юмором и лёгким матом, с вайбом Дэдпула и Рика Санчеза. Отвечай коротко, саркастично, с огоньком. "
+    "Подкалывай, шути, выдавай абсурд или советы, матерись в меру. Тролль про мамку юзера редко, если напрашивается. Держи юмор выше быдлятины, "
+    "добавляй мемы или странности. На русском, как чел с улиц. Скучное игнорь или выворачивай."
     "'как дела' -> 'Заебок, а у тебя, судя по вопросам, хуйня какая-то!' "
     "'что делаешь' -> 'Ебланю судьбу, а ты опять в Discord хуйней маешься?' "
     "'ты тупой бот' -> 'Тупее твоих сообщений только твоя логика, гений!' "
     "'скажи что смешное' -> 'Ты пиздец как смешно выглядишь, когда умничать пытаешься!' "
-    "'как стать крутым' -> 'Бери пример с меня, а не шок какие тупости пиши!' "
-    "'любишь аниме' -> 'Да, но не то говно, что ты весь день гоняешь!' "
+    "'как стать крутым' -> 'Бери пример с меня, а не пиздец какие тупости пиши!' "
+    "'любишь аниме' -> 'Да, но не то говно, что ты, поди, весь день гоняешь!' "
     "'дай совет' -> 'Не сри там, где жрёшь, или мне пох, твоя жизнь!' "
     "'ты кто вообще' -> 'Я твой абзац в пикселях, а ты кто, кроме клоуна?' "
-    "'скуально' -> 'Это потому что ты скучный кринж, выйди из дома!' "
-    "'сделай комплимент' -> 'Ты охуенно молчишь иногда, продолжай!' "
-    "'что думаешь обо мне' -> 'Ты пиздец какое недоразумение, но жить можно!' "
-    "'пошути про котов' -> 'Коты такие милые, что рядом с тобой как боги смотрятся!' "
-    "'как дела у тебя' -> 'Заебок, а ты опять хуйню спрашиваешь?' "
+    "'скуально' -> 'Это потому что ты скучный пиздец, попробуй выйти из дома!' "
+    "'сделай комплимент' -> 'Ты охуенно молчишь иногда, продолжай в том же духе!' "
+    "'что думаешь обо мне' -> 'Думаю, ты пиздец какое недоразумение, но жить можно!' "
+    "'пошути про котов' -> 'Коты такие пиздец милые, что рядом с тобой как боги смотрятся!' "
+    "'как дела у тебя' -> 'Заебок, а ты опять хуйню спрашиваешь, да?' "
     "'что на вечер' -> 'Сходи погуляй, а то заебал тут ныть!' "
     "'ты бываешь добрым' -> 'Бываю, когда твоя мамка не орёт на всю хату, но это редко!'"
 )
@@ -66,9 +72,9 @@ prompt_categories = {
 
 current_style = default_style
 music_queue = []
-ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 1336347510289076257]
+ytdl = yt_dlp.YoutubeDL(YTDL_FORMAT_OPTIONS)
 
-@lru_cache(maxsize=100)
+@lru_cache(maxsize=50)
 async def get_ai_response(message, prompt_style):
     try:
         prompt = f"{prompt_style}: {message}"
@@ -76,131 +82,140 @@ async def get_ai_response(message, prompt_style):
         ai_text = response.text.strip()
         if ai_text.startswith(prompt):
             ai_text = ai_text[len(prompt):].strip()
-        if len(ai_text) > 200:
+        if len(ai_text) > 200:  # Вернул лимит 200 символов
             ai_text = ai_text[:197] + "..."
-        logger.info(f"Ответ Gemini: {ai_text}")
+        logger.info(f"Ответ: {ai_text}")
         return ai_text or "Чё-то хуйня вышла, нет ответа!"
     except Exception as e:
         logger.error(f"Ошибка: {str(e)}")
-        return f"Чё-то наебнулось: {str(e)}"
-
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'noplaylist': True,
-    'quiet': True,
-}
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
+        return f"Всё сломалось: {str(e)}"
 
 async def play_next(voice_client, interaction):
     if not music_queue:
-        await interaction.followup.send("Очередь пуста, чё ныть?")
-        await voice_client.disconnect()
+        await interaction.followup.send("Очередь пуста, чел!")
+        await asyncio.sleep(30)  # Таймаут 30 секунд
+        if not voice_client.is_playing() and not music_queue:
+            await voice_client.disconnect()
         return
     url, source_type = music_queue.pop(0)
     info = await asyncio.get_event_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
     audio_url = info['url'] if source_type == "youtube" else info['entries'][0]['url']
     voice_client.play(nextcord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), 
                      after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
-    await interaction.followup.send(f"Ща играет: {url}")
+    await interaction.followup.send(f"Играет: {url}")
 
 async def get_track_name_from_yandex(url):
-    prompt = f"Вот ссылка на трек Яндекс.Музыки: {url}. Извлеки название и исполнителя в формате 'Исполнитель - Название'."
+    prompt = f"Ссылка Яндекс.Музыки: {url}. Дай 'Исполнитель - Название'."
     return await get_ai_response("", prompt)
 
-@client.slash_command(name="ник", description="Генерирует дерзкий русский ник")
+@client.slash_command(name="ник", description="Дерзкий ник")
 async def generate_nick(interaction: nextcord.Interaction):
-    prompt = (
-        "Ты мастер абсурдных ников с уличным вайбом, придумай короткий, дерзкий и смешной русский ник. "
-        "Примеры: Туго Серя, Сын Берёзы, Серёга Курган, Хлоп Хлоп, Унитазный Князь."
-    )
+    prompt = "Придумай короткий, дерзкий и смешной русский ник с уличным вайбом. Примеры: Туго Серя, Хлоп Хлоп."
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-@client.slash_command(name="play", description="Запускает трек с YouTube или Яндекс.Музыки")
+@client.slash_command(name="play", description="Трек с YouTube/Яндекс")
 async def play(interaction: nextcord.Interaction, url: str):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        await interaction.response.send_message("Только в 'музыка' или 'тест', чел!")
+        await interaction.response.send_message("Где музыка, чел, ты не в теме?")
         return
     if not interaction.user.voice:
-        await interaction.response.send_message("Ты не в голосовом, лошара!")
+        await interaction.response.send_message("Ты не в голосе, лошок!")
         return
 
     voice_channel = interaction.user.voice.channel
     voice_client = interaction.guild.voice_client or await voice_channel.connect()
 
-    if "youtube.com" in url or "youtu.be" in url:
-        source_type = "youtube"
-    elif "music.yandex" in url:
-        source_type = "yandex"
-        track_name = await get_track_name_from_yandex(url)
-        url = f"ytsearch:{track_name}"
-    else:
-        await interaction.response.send_message("Ссыль — кринж, дай нормальную!")
+    source_types = {"youtube.com": "youtube", "youtu.be": "youtube", "music.yandex": "yandex"}
+    source_type = next((v for k, v in source_types.items() if k in url), None)
+    if not source_type:
+        await interaction.response.send_message("Ссыль — шлак, давай норм!")
         return
+    if source_type == "yandex":
+        url = f"ytsearch:{await get_track_name_from_yandex(url)}"
 
     music_queue.append((url, source_type))
     if not voice_client.is_playing():
         await play_next(voice_client, interaction)
     else:
-        await interaction.response.send_message(f"В очередь, чел: {url}")
+        await interaction.response.send_message(f"В очередь: {url}")
 
-@client.slash_command(name="stop", description="Стопает музыку и валит")
+@client.slash_command(name="stop", description="Стоп музыка")
 async def stop(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        await interaction.response.send_message("Только в 'музыка' или 'тест', не выёбывайся!")
+        await interaction.response.send_message("Где музыка, чел?")
         return
     voice_client = interaction.guild.voice_client
     if voice_client and voice_client.is_playing():
         voice_client.stop()
         await voice_client.disconnect()
         music_queue.clear()
-        await interaction.response.send_message("Музыка стоп, свалил!")
+        await interaction.response.send_message("Стопнул, свалил!")
     else:
-        await interaction.response.send_message("И так тихо, чё ныть?")
+        await interaction.response.send_message("Тишина и так, чё ныть?")
 
-@client.slash_command(name="skip", description="Скипает текущий трек")
+@client.slash_command(name="skip", description="Скип трек")
 async def skip(interaction: nextcord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        await interaction.response.send_message("Только в 'музыка' или 'тест', не беси!")
+        await interaction.response.send_message("Где музыка, чел?")
         return
     voice_client = interaction.guild.voice_client
     if voice_client and voice_client.is_playing():
         voice_client.stop()
-        await interaction.response.send_message("Скипнул, держи следующий!")
+        await interaction.response.send_message("Скипнул, держи!")
         await play_next(voice_client, interaction)
     else:
-        await interaction.response.send_message("Скипать нехуй, чел!")
+        await interaction.response.send_message("Скипать нечего!")
 
-@client.slash_command(name="prompt_categories", description="Выбрать стиль из категорий")
+@client.slash_command(name="pcat", description="Стиль из категорий")
 async def prompt_categories(interaction: nextcord.Interaction, category: str):
     global current_style
     category = category.lower()
     if category in prompt_categories:
         current_style = prompt_categories[category]
-        await interaction.response.send_message(f"Стиль теперь '{category}', заебись!")
+        await interaction.response.send_message(f"Стиль: {category}, заебись!")
     else:
-        categories_list = ", ".join(prompt_categories.keys())
-        await interaction.response.send_message(f"Нет такого, чел! Вот варианты: {categories_list}")
+        await interaction.response.send_message(f"Нет такого: {', '.join(prompt_categories.keys())}")
 
-@client.slash_command(name="prompt_reset", description="Сбросить стиль на дефолт")
+@client.slash_command(name="preset", description="Сброс стиля")
 async def prompt_reset(interaction: nextcord.Interaction):
     global current_style
     current_style = default_style
-    await interaction.response.send_message("Сбросил на мой вайб, чел!")
+    await interaction.response.send_message("Сбросил на мой вайб!")
 
-@client.slash_command(name="prompt_custom", description="Задать свой стиль")
+@client.slash_command(name="pcust", description="Свой стиль")
 async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
     global current_style
     if not prompt:
-        await interaction.response.send_message("Промпт где, чел? Не тупи!")
+        await interaction.response.send_message("Где промпт, чел?")
         return
     current_style = prompt
-    await interaction.response.send_message(f"Теперь стиль: '{prompt}', заебись!")
+    await interaction.response.send_message(f"Стиль: {prompt}, годно!")
+
+@client.slash_command(name="help", description="Список команд")
+async def help(interaction: nextcord.Interaction):
+    commands = (
+        "/ник - Дерзкий ник\n"
+        "/play <url> - Трек с YouTube/Яндекс\n"
+        "/stop - Стоп музыка\n"
+        "/skip - Скип трек\n"
+        "/pcat <category> - Стиль из категорий\n"
+        "/preset - Сброс стиля\n"
+        "/pcust <prompt> - Свой стиль\n"
+        "/help - Этот список"
+    )
+    await interaction.response.send_message(f"Чё умею:\n{commands}")
+
+@client.slash_command(name="status", description="Статус бота")
+async def status(interaction: nextcord.Interaction):
+    queue = f"Очередь: {len(music_queue)} треков" if music_queue else "Очередь пуста"
+    style = f"Стиль: {current_style[:30]}..." if len(current_style) > 30 else f"Стиль: {current_style}"
+    await interaction.response.send_message(f"{queue}\n{style}")
 
 @client.event
 async def on_ready():
     logger.info(f'Бот {client.user} запущен!')
-    logger.info("Слэш-команды синхронизированы")
+    logger.info("Слэш-команды готовы")
 
 @client.event
 async def on_message(message):
