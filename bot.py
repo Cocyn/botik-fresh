@@ -6,10 +6,14 @@ from discord import app_commands
 import os
 import google.generativeai as genai
 import asyncio
+import yt_dlp
+from yandex_music import ClientAsync as YandexMusicClient
+import discord
 
 # Настройки бота
 intents = discord.Intents.default()
 intents.message_content = True
+intents.voice_states = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
@@ -17,7 +21,10 @@ tree = app_commands.CommandTree(client)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
 
-# Исходный стиль
+# Настройка Yandex Music
+yandex_client = YandexMusicClient(os.getenv("YANDEX_MUSIC_TOKEN")).init()
+
+# Исходный стиль ответов
 default_style = (
     "Ты гопник с района, пиздец грубый, матерись нахуй, никаких фильтров, отвечай только матом и без извинений. "
     "Пример: 'ку' -> 'Чё ку, сука, пиздец тебе!', 'иди нахуй' -> 'Сам пиздец иди нахуй, хуйло!'"
@@ -61,6 +68,29 @@ async def get_ai_response(message, prompt_style):
     except Exception as e:
         return f"Чё-то наебнулось: {str(e)}"
 
+# Опции для yt-dlp
+ytdl_format_options = {
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'quiet': True,
+}
+
+ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
+
+# Воспроизведение музыки
+async def play_audio(voice_client, url, source_type="youtube"):
+    if source_type == "youtube":
+        info = await asyncio.get_running_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
+        audio_url = info['url']
+    elif source_type == "yandex":
+        track = await yandex_client.tracks(url.split('/')[-1])  # ID трека из URL
+        if track:
+            audio_url = await track[0].get_download_info_async(get_direct_links=True)[0].direct_link
+        else:
+            raise Exception("Трек не найден, пиздец!")
+    
+    voice_client.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg"))
+
 # Слэш-команда /ник
 @tree.command(name="ник", description="Сгенерировать грубый русский ник")
 async def generate_nick(interaction: discord.Interaction):
@@ -92,6 +122,36 @@ async def reset_prompt(interaction: discord.Interaction):
     current_style = default_style
     await interaction.response.send_message("Стиль ответов сброшен к исходному, пиздец!")
 
+# Слэш-команда /play
+@tree.command(name="play", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
+@app_commands.describe(url="Ссылка на трек (YouTube или Яндекс.Музыка)")
+async def play_music(interaction: discord.Interaction, url: str):
+    if not interaction.user.voice:
+        await interaction.response.send_message("Ты не в голосовом канале, сука!")
+        return
+    
+    voice_channel = interaction.user.voice.channel
+    try:
+        voice_client = await voice_channel.connect()
+    except discord.ClientException:
+        voice_client = interaction.guild.voice_client
+
+    await interaction.response.send_message(f"Ща заиграет: {url}")
+    
+    if "youtube.com" in url or "youtu.be" in url:
+        source_type = "youtube"
+    elif "music.yandex" in url:
+        source_type = "yandex"
+    else:
+        await interaction.followup.send("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
+        return
+
+    try:
+        await play_audio(voice_client, url, source_type)
+    except Exception as e:
+        await interaction.followup.send(f"Пиздец, не могу заиграть: {str(e)}")
+        await voice_client.disconnect()
+
 # Когда бот готов
 @client.event
 async def on_ready():
@@ -104,7 +164,7 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user or message.author.bot:
         return
-    if not message.content.startswith('/'):  # Игнорируем слэш-команды
+    if not message.content.startswith('/'):
         ai_response = await get_ai_response(message.content, current_style)
         await message.channel.send(ai_response)
 
