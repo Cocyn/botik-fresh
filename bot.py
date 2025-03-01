@@ -107,88 +107,88 @@ async def generate_nick(interaction: nextcord.Interaction):
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-# Объединённая команда /play
-@client.slash_command(name="play", description="Управление музыкальным плеером")
-async def play(interaction: nextcord.Interaction, action: str, url: str = None):
+# Слэш-команда /play
+@client.slash_command(name="play", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
+async def play(interaction: nextcord.Interaction, url: str):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
 
-    action = action.lower()
+    if not interaction.user.voice:
+        await interaction.response.send_message("Ты не в голосовом канале, сука!")
+        return
+
+    voice_channel = interaction.user.voice.channel
+    try:
+        voice_client = await voice_channel.connect()
+    except nextcord.ClientException:
+        voice_client = interaction.guild.voice_client
+
+    if "youtube.com" in url or "youtu.be" in url:
+        source_type = "youtube"
+    elif "music.yandex" in url:
+        source_type = "yandex"
+        track_name = await get_track_name_from_yandex(url)
+        url = f"ytsearch:{track_name}"
+    else:
+        await interaction.response.send_message("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
+        return
+
+    music_queue.append((url, source_type))
+    if not voice_client.is_playing():
+        await play_next(voice_client, interaction)
+    else:
+        await interaction.response.send_message(f"Добавлено в очередь: {url}")
+
+# Слэш-команда /stop
+@client.slash_command(name="stop", description="Остановить музыку и отключиться")
+async def stop(interaction: nextcord.Interaction):
+    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
+        return
+
     voice_client = interaction.guild.voice_client
-
-    if action == "track":
-        if not url:
-            await interaction.response.send_message("Дай ссыль на трек, сука!")
-            return
-        if not interaction.user.voice:
-            await interaction.response.send_message("Ты не в голосовом канале, сука!")
-            return
-
-        voice_channel = interaction.user.voice.channel
-        try:
-            voice_client = await voice_channel.connect()
-        except nextcord.ClientException:
-            voice_client = interaction.guild.voice_client
-
-        if "youtube.com" in url or "youtu.be" in url:
-            source_type = "youtube"
-        elif "music.yandex" in url:
-            source_type = "yandex"
-            track_name = await get_track_name_from_yandex(url)
-            url = f"ytsearch:{track_name}"
-        else:
-            await interaction.response.send_message("Ссыль хуйня, дай нормальную (YouTube или Яндекс.Музыка)!")
-            return
-
-        music_queue.append((url, source_type))
-        if not voice_client.is_playing():
-            await play_next(voice_client, interaction)
-        else:
-            await interaction.response.send_message(f"Добавлено в очередь: {url}")
-
-    elif action == "stop":
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
-            await voice_client.disconnect()
-            music_queue.clear()
-            await interaction.response.send_message("Музыка стоп, пиздец, отключился!")
-        else:
-            await interaction.response.send_message("Ниче не играет, сука!")
-
-    elif action == "skip":
-        if voice_client and voice_client.is_playing():
-            voice_client.stop()
-            await interaction.response.send_message("Трек скипнут, пиздец!")
-            await play_next(voice_client, interaction)
-        else:
-            await interaction.response.send_message("Ниче не играет, сука!")
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        await voice_client.disconnect()
+        music_queue.clear()
+        await interaction.response.send_message("Музыка стоп, пиздец, отключился!")
     else:
-        await interaction.response.send_message("Такого действия нет, сука! Используй: track, stop, skip")
+        await interaction.response.send_message("Ниче не играет, сука!")
 
-# Объединённая команда /prompt
-@client.slash_command(name="prompt", description="Настройка стилей ответов бота")
-async def prompt(interaction: nextcord.Interaction, action: str, category: str = None):
+# Слэш-команда /skip
+@client.slash_command(name="skip", description="Пропустить текущий трек")
+async def skip(interaction: nextcord.Interaction):
+    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+        await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
+        return
+
+    voice_client = interaction.guild.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.stop()
+        await interaction.response.send_message("Трек скипнут, пиздец!")
+        await play_next(voice_client, interaction)
+    else:
+        await interaction.response.send_message("Ниче не играет, сука!")
+
+# Слэш-команда /prompt_categories
+@client.slash_command(name="prompt_categories", description="Выбрать стиль ответов из категорий")
+async def prompt_categories(interaction: nextcord.Interaction, category: str):
     global current_style
-    action = action.lower()
-
-    if action == "categories":
-        if not category:
-            await interaction.response.send_message("Укажи категорию, сука! Доступны: матные, унизительные, абсурдные, кот")
-            return
-        category = category.lower()
-        if category in prompt_categories:
-            current_style = prompt_categories[category]
-            await interaction.response.send_message(f"Стиль ответов теперь '{category}', пиздец круто!")
-        else:
-            categories_list = ", ".join(prompt_categories.keys())
-            await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
-
-    elif action == "reset":
-        current_style = default_style
-        await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
+    category = category.lower()
+    if category in prompt_categories:
+        current_style = prompt_categories[category]
+        await interaction.response.send_message(f"Стиль ответов теперь '{category}', пиздец круто!")
     else:
-        await interaction.response.send_message("Такого действия нет, сука! Используй: categories, reset")
+        categories_list = ", ".join(prompt_categories.keys())
+        await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
+
+# Слэш-команда /prompt_reset
+@client.slash_command(name="prompt_reset", description="Вернуть стиль ответов к исходному гопнику")
+async def prompt_reset(interaction: nextcord.Interaction):
+    global current_style
+    current_style = default_style
+    await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
 
 @client.event
 async def on_ready():
