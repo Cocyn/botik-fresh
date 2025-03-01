@@ -48,7 +48,7 @@ prompt_categories = {
 # Глобальные переменные
 current_style = default_style
 music_queue = []
-ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 1336347510289076257]  # "тест" и "музыка" (замени ID "музыка")
+ALLOWED_MUSIC_CHANNELS = [1345015845033607322, 123456789012345678]  # "тест" и "музыка" (замени ID "музыка")
 
 # Асинхронная функция для Gemini
 async def get_ai_response(message, prompt_style):
@@ -107,30 +107,12 @@ async def generate_nick(interaction: discord.Interaction):
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-# Слэш-команда /промпт
-@tree.command(name="промпт", description="Обновить стиль ответов бота по категории")
-@app_commands.describe(category="Выбери категорию: матные, унизительные, абсурдные, кот")
-async def update_prompt(interaction: discord.Interaction, category: str):
-    global current_style
-    category = category.lower()
-    if category in prompt_categories:
-        current_style = prompt_categories[category]
-        await interaction.response.send_message(f"Стиль ответов обновлён на категорию: '{category}'")
-    else:
-        categories_list = ", ".join(prompt_categories.keys())
-        await interaction.response.send_message(f"Такой категории нет, сука! Доступны: {categories_list}")
+# Группа команд /play
+play_group = app_commands.Group(name="play", description="Управление музыкальным плеером")
 
-# Слэш-команда /сброс
-@tree.command(name="сброс", description="Вернуть стиль ответов к исходному")
-async def reset_prompt(interaction: discord.Interaction):
-    global current_style
-    current_style = default_style
-    await interaction.response.send_message("Стиль ответов сброшен к исходному, пиздец!")
-
-# Слэш-команда /play
-@tree.command(name="play", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
+@play_group.command(name="track", description="Воспроизвести музыку из YouTube или Яндекс.Музыки")
 @app_commands.describe(url="Ссылка на трек (YouTube или Яндекс.Музыка)")
-async def play_music(interaction: discord.Interaction, url: str):
+async def play_track(interaction: discord.Interaction, url: str):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -161,9 +143,8 @@ async def play_music(interaction: discord.Interaction, url: str):
     else:
         await interaction.response.send_message(f"Добавлено в очередь: {url}")
 
-# Слэш-команда /stop
-@tree.command(name="stop", description="Остановить музыку и отключиться")
-async def stop_music(interaction: discord.Interaction):
+@play_group.command(name="stop", description="Остановить музыку и отключиться")
+async def play_stop(interaction: discord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -177,9 +158,8 @@ async def stop_music(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("Ниче не играет, сука!")
 
-# Слэш-команда /skip
-@tree.command(name="skip", description="Пропустить текущий трек")
-async def skip_music(interaction: discord.Interaction):
+@play_group.command(name="skip", description="Пропустить текущий трек")
+async def play_skip(interaction: discord.Interaction):
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Эта команда работает только в каналах 'музыка' и 'тест', пиздец!")
         return
@@ -191,6 +171,28 @@ async def skip_music(interaction: discord.Interaction):
         await play_next(voice_client, interaction)
     else:
         await interaction.response.send_message("Ниче не играет, сука!")
+
+# Группа команд /prompt
+prompt_group = app_commands.Group(name="prompt", description="Настройка стилей ответов бота")
+
+@prompt_group.command(name="categories", description="Выбрать стиль ответов из категорий")
+@app_commands.describe(category="Категория: матные, унизительные, абсурдные, кот")
+async def prompt_categories(interaction: discord.Interaction, category: str):
+    global current_style
+    category = category.lower()
+    if category in prompt_categories:
+        current_style = prompt_categories[category]
+        await interaction.response.send_message(f"Стиль ответов теперь '{category}', пиздец круто!")
+    else:
+        categories_list = ", ".join(prompt_categories.keys())
+        await interaction.response.send_message(f"Нет такой хуйни, сука! Выбирай из: {categories_list}")
+
+# Слэш-команда /сброс
+@tree.command(name="сброс", description="Вернуть стиль ответов к исходному гопнику")
+async def reset_prompt(interaction: discord.Interaction):
+    global current_style
+    current_style = default_style
+    await interaction.response.send_message("Стиль сброшен к гопнику, пиздец как раньше!")
 
 # Когда бот готов
 @client.event
