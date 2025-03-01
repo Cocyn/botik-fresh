@@ -87,7 +87,7 @@ async def play_next(voice_client, interaction):
         await interaction.followup.send("Очередь пуста, пиздец!")
         await voice_client.disconnect()
 
-# Извлечение названия трека из URL Яндекс.Музыки
+# Извлечение названия трека из URL Яндекс.Музыки через Gemini
 async def get_track_name_from_yandex(url):
     prompt = (
         f"Вот ссылка на трек Яндекс.Музыки: {url}. "
