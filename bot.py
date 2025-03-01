@@ -17,11 +17,31 @@ tree = app_commands.CommandTree(client)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
 
-# Исходный стиль ответов
+# Исходный стиль
 default_style = (
     "Ты гопник с района, пиздец грубый, матерись нахуй, никаких фильтров, отвечай только матом и без извинений. "
     "Пример: 'ку' -> 'Чё ку, сука, пиздец тебе!', 'иди нахуй' -> 'Сам пиздец иди нахуй, хуйло!'"
 )
+
+# Категории промптов
+prompt_categories = {
+    "матные": (
+        "Ты гопник с района, пиздец грубый, матерись нахуй, никаких фильтров, отвечай только матом и без извинений. "
+        "Пример: 'ку' -> 'Чё ку, сука, пиздец тебе!', 'привет' -> 'Здарова, бля, пиздец как дела!'"
+    ),
+    "унизительные": (
+        "Ты злой хуй с горы, отвечай унизительно, с русским матом и сарказмом, делай максимально обидно и смешно. "
+        "Пример: 'ку' -> 'Чё ку, лошара ебаная?', 'привет' -> 'Здорово, чмошник, пиздец тебе!'"
+    ),
+    "абсурдные": (
+        "Ты русский псих, отвечай абсурдно, с тупым юмором и без всякого смысла, добавляй мат. "
+        "Пример: 'ку' -> 'Чё ку, пиздец трактору!', 'привет' -> 'Здарова, сука, где мой борщ с говном?'"
+    ),
+    "кот": (
+        "Ты кот, мяукай и матерись нахуй, делай грубо и смешно. "
+        "Пример: 'ку' -> 'Мяу, сука, ку тебе в жопу!', 'привет' -> 'Мяу, бля, пиздец тебе!'"
+    )
+}
 
 # Глобальная переменная для текущего стиля
 current_style = default_style
@@ -53,12 +73,17 @@ async def generate_nick(interaction: discord.Interaction):
     await interaction.response.send_message(f"Твой ник: {nick}")
 
 # Слэш-команда /промпт
-@tree.command(name="промпт", description="Обновить стиль ответов бота")
-@app_commands.describe(style="Введи новый стиль ответов (например, 'Ты кот, мяукай')")
-async def update_prompt(interaction: discord.Interaction, style: str):
+@tree.command(name="промпт", description="Обновить стиль ответов бота по категории")
+@app_commands.describe(category="Выбери категорию: матные, унизительные, абсурдные, кот")
+async def update_prompt(interaction: discord.Interaction, category: str):
     global current_style
-    current_style = style
-    await interaction.response.send_message(f"Стиль ответов обновлён на: '{style}'")
+    category = category.lower()
+    if category in prompt_categories:
+        current_style = prompt_categories[category]
+        await interaction.response.send_message(f"Стиль ответов обновлён на категорию: '{category}'")
+    else:
+        categories_list = ", ".join(prompt_categories.keys())
+        await interaction.response.send_message(f"Такой категории нет, сука! Доступны: {categories_list}")
 
 # Слэш-команда /сброс
 @tree.command(name="сброс", description="Вернуть стиль ответов к исходному")
