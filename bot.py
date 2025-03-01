@@ -109,14 +109,20 @@ async def get_track_name_from_yandex(url):
     prompt = f"Ссылка Яндекс.Музыки: {url}. Дай 'Исполнитель - Название'."
     return await get_ai_response("", prompt)
 
-@client.slash_command(name="ник", description="Дерзкий ник", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="ник", description="Дерзкий ник")
 async def generate_nick(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     prompt = "Придумай короткий, дерзкий и смешной русский ник с уличным вайбом. Примеры: Туго Серя, Хлоп Хлоп."
     nick = await get_ai_response("", prompt)
     await interaction.response.send_message(f"Твой ник: {nick}")
 
-@client.slash_command(name="play", description="Трек с YouTube/Яндекс", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="play", description="Трек с YouTube/Яндекс")
 async def play(interaction: nextcord.Interaction, url: str):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел, ты не в теме?")
         return
@@ -141,8 +147,11 @@ async def play(interaction: nextcord.Interaction, url: str):
     else:
         await interaction.response.send_message(f"В очередь: {url}")
 
-@client.slash_command(name="stop", description="Стоп музыка", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="stop", description="Стоп музыка")
 async def stop(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел?")
         return
@@ -155,8 +164,11 @@ async def stop(interaction: nextcord.Interaction):
     else:
         await interaction.response.send_message("Тишина и так, чё ныть?")
 
-@client.slash_command(name="skip", description="Скип трек", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="skip", description="Скип трек")
 async def skip(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
         await interaction.response.send_message("Где музыка, чел?")
         return
@@ -168,8 +180,11 @@ async def skip(interaction: nextcord.Interaction):
     else:
         await interaction.response.send_message("Скипать нечего!")
 
-@client.slash_command(name="pcat", description="Стиль из категорий", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="pcat", description="Стиль из категорий")
 async def prompt_categories(interaction: nextcord.Interaction, category: str):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     global current_style
     category = category.lower()
     if category in prompt_categories:
@@ -178,14 +193,20 @@ async def prompt_categories(interaction: nextcord.Interaction, category: str):
     else:
         await interaction.response.send_message(f"Нет такого: {', '.join(prompt_categories.keys())}")
 
-@client.slash_command(name="preset", description="Сброс стиля", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="preset", description="Сброс стиля")
 async def prompt_reset(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     global current_style
     current_style = default_style
     await interaction.response.send_message("Сбросил на мой вайб!")
 
-@client.slash_command(name="pcust", description="Свой стиль", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="pcust", description="Свой стиль")
 async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     global current_style
     if not prompt:
         await interaction.response.send_message("Где промпт, чел?")
@@ -193,14 +214,20 @@ async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
     current_style = prompt
     await interaction.response.send_message(f"Стиль: {prompt}, годно!")
 
-@client.slash_command(name="sync", description="Синхронизировать команды", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="sync", description="Синхронизировать команды")
 async def sync(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     await client.sync_all_application_commands()
     logger.info("Команды синхронизированы для сервера P4P")
     await interaction.response.send_message("Команды синхронизированы, чел!")
 
-@client.slash_command(name="help", description="Список команд", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="help", description="Список команд")
 async def help(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     commands = (
         "/ник - Дерзкий ник\n"
         "/play <url> - Трек с YouTube/Яндекс\n"
@@ -214,8 +241,11 @@ async def help(interaction: nextcord.Interaction):
     )
     await interaction.response.send_message(f"Чё умею:\n{commands}")
 
-@client.slash_command(name="status", description="Статус бота", guild=discord.Object(id=GUILD_ID))
+@client.slash_command(name="status", description="Статус бота")
 async def status(interaction: nextcord.Interaction):
+    if interaction.guild.id != GUILD_ID:
+        await interaction.response.send_message("Работаю только на P4P, чел!")
+        return
     queue = f"Очередь: {len(music_queue)} треков" if music_queue else "Очередь пуста"
     style = f"Стиль: {current_style[:30]}..." if len(current_style) > 30 else f"Стиль: {current_style}"
     await interaction.response.send_message(f"{queue}\n{style}")
@@ -223,7 +253,11 @@ async def status(interaction: nextcord.Interaction):
 @client.event
 async def on_ready():
     logger.info(f'Бот {client.user} запущен!')
-    logger.info("Слэш-команды готовы, используй /sync для обновления")
+    try:
+        await client.sync_all_application_commands()  # Глобальная синхронизация
+        logger.info("Слэш-команды синхронизированы для P4P")
+    except Exception as e:
+        logger.error(f"Ошибка синхронизации: {str(e)}")
 
 @client.event
 async def on_message(message):
