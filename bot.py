@@ -15,7 +15,7 @@ YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': 
 GUILD_ID = 1336347509680766978  # Твой сервер P4P
 
 # Логирование
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levellevel)s - %(message)s", 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
                     handlers=[logging.FileHandler("bot.log"), logging.StreamHandler()])
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
 
 default_style = (
-    "Ты — дерзкий Discord-бот с чёрным юмором и лёгким матом, с вайбом Дэдпула и Рика Санчеза. Отвечай коротко, с сарказмом, "
-    "подкалывай, шути, выдавай абсурд или советы, матерись в меру. Тролль про мамку юзера редко, если напрашивается, "
+    "Ты — дерзкий Discord-бот с чёрным юмором и лёгким матом, с вайбом Дэдпула и Рика Санчеза. Отвечай коротко, саркастично, с огоньком. "
+    "Подкалывай, шути, выдавай абсурд или советы, матерись в меру. Тролль про мамку юзера редко, если напрашивается. Держи юмор выше быдлятины, "
     "добавляй мемы или странности. На русском, как чел с улиц. Скучное игнорь или выворачивай."
     "'как дела' -> 'Заебок, а у тебя, судя по вопросам, хуйня какая-то!' "
     "'что делаешь' -> 'Ебланю судьбу, а ты опять в Discord хуйней маешься?' "
@@ -98,15 +98,11 @@ async def play_next(voice_client, interaction):
         if not voice_client.is_playing() and not music_queue:
             await voice_client.disconnect()
         return
-    
     url, source_type = music_queue.pop(0)
     info = await asyncio.get_event_loop().run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
     audio_url = info['url'] if source_type == "youtube" else info['entries'][0]['url']
-    
-    def after_playing(e):
-        asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop)
-    
-    voice_client.play(nextcord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), after=after_playing)
+    voice_client.play(nextcord.FFmpegPCMAudio(audio_url, executable="ffmpeg"), 
+                     after=lambda e: asyncio.run_coroutine_threadsafe(play_next(voice_client, interaction), client.loop))
     await interaction.followup.send(f"Играет: {url}")
 
 async def get_track_name_from_yandex(url):
@@ -142,7 +138,7 @@ async def play(interaction: nextcord.Interaction, url: str):
     if not source_type:
         await interaction.response.send_message("Ссыль — шлак, давай норм!")
         return
-    if source type == "yandex":
+    if source_type == "yandex":
         url = f"ytsearch:{await get_track_name_from_yandex(url)}"
 
     music_queue.append((url, source_type))
@@ -265,11 +261,9 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    if message.author == client user or message.author.bot:
+    if message.author == client.user or message.author.bot:
         return
-    if message.channel.id not in ALLOWED_MUSIC_CHANNELS:
-        return
-    if not message content.startswith('/'):
+    if not message.content.startswith('/'):
         ai_response = await get_ai_response(message.content, current_style)
         await message.channel.send(ai_response)
 
