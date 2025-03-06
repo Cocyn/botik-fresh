@@ -7,12 +7,13 @@ import google.generativeai as genai
 import asyncio
 import yt_dlp
 import logging
+import json
 from functools import lru_cache
 
 # Константы
-ALLOWED_MUSIC_CHANNELS = {1345015845033607322, 1336347510289076257}
 YTDL_FORMAT_OPTIONS = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True}
-GUILD_ID = 1336347509680766978  # Твой сервер P4P
+GUILD_ID = 1336347509680766978  # Твой сервер P4P (по умолчанию)
+SETTINGS_FILE = "settings.json"
 
 # Логирование
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", 
@@ -26,6 +27,31 @@ client = nextcord.Client(intents=intents)
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash", generation_config={"temperature": 1.0, "top_p": 0.9})
+
+# Загрузка и сохранение настроек
+def load_settings():
+    default_settings = {
+        "allowed_guilds": [GUILD_ID],
+        "allowed_channels": [1345015845033607322, 1336347510289076257]  # По умолчанию твои музыкальные каналы
+    }
+    if not os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(default_settings, f, indent=4)
+        return default_settings
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Ошибка загрузки настроек: {str(e)}. Использую стандартные.")
+        return default_settings
+
+def save_settings(settings):
+    with open(SETTINGS_FILE, 'w') as f:
+        json.dump(settings, f, indent=4)
+
+settings = load_settings()
+allowed_guilds = settings["allowed_guilds"]
+allowed_channels = settings["allowed_channels"]
 
 default_style = (
     "Ты — дерзкий Discord-бот с чёрным юмором и лёгким матом, с вайбом Дэдпула и Рика Санчеза. Отвечай коротко, саркастично, с огоньком. "
@@ -94,7 +120,7 @@ async def get_ai_response(message, prompt_style):
 async def play_next(voice_client, interaction):
     if not music_queue:
         await interaction.followup.send("Очередь пуста, чел!")
-        await asyncio.sleep(30)  # Таймаут 30 секунд
+        await asyncio.sleep(30)
         if not voice_client.is_playing() and not music_queue:
             await voice_client.disconnect()
         return
@@ -111,8 +137,8 @@ async def get_track_name_from_yandex(url):
 
 @client.slash_command(name="ник", description="Дерзкий ник")
 async def generate_nick(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     prompt = "Придумай короткий, дерзкий и смешной русский ник с уличным вайбом. Примеры: Туго Серя, Хлоп Хлоп."
     nick = await get_ai_response("", prompt)
@@ -120,10 +146,10 @@ async def generate_nick(interaction: nextcord.Interaction):
 
 @client.slash_command(name="play", description="Трек с YouTube/Яндекс")
 async def play(interaction: nextcord.Interaction, url: str):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
-    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+    if interaction.channel.id not in allowed_channels:
         await interaction.response.send_message("Где музыка, чел, ты не в теме?")
         return
     if not interaction.user.voice:
@@ -149,10 +175,10 @@ async def play(interaction: nextcord.Interaction, url: str):
 
 @client.slash_command(name="stop", description="Стоп музыка")
 async def stop(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
-    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+    if interaction.channel.id not in allowed_channels:
         await interaction.response.send_message("Где музыка, чел?")
         return
     voice_client = interaction.guild.voice_client
@@ -166,10 +192,10 @@ async def stop(interaction: nextcord.Interaction):
 
 @client.slash_command(name="skip", description="Скип трек")
 async def skip(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
-    if interaction.channel.id not in ALLOWED_MUSIC_CHANNELS:
+    if interaction.channel.id not in allowed_channels:
         await interaction.response.send_message("Где музыка, чел?")
         return
     voice_client = interaction.guild.voice_client
@@ -182,8 +208,8 @@ async def skip(interaction: nextcord.Interaction):
 
 @client.slash_command(name="pcat", description="Стиль из категорий")
 async def prompt_categories(interaction: nextcord.Interaction, category: str):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     global current_style
     category = category.lower()
@@ -195,8 +221,8 @@ async def prompt_categories(interaction: nextcord.Interaction, category: str):
 
 @client.slash_command(name="preset", description="Сброс стиля")
 async def prompt_reset(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     global current_style
     current_style = default_style
@@ -204,8 +230,8 @@ async def prompt_reset(interaction: nextcord.Interaction):
 
 @client.slash_command(name="pcust", description="Свой стиль")
 async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     global current_style
     if not prompt:
@@ -214,19 +240,64 @@ async def prompt_custom(interaction: nextcord.Interaction, prompt: str):
     current_style = prompt
     await interaction.response.send_message(f"Стиль: {prompt}, годно!")
 
+@client.slash_command(name="add_channel", description="Добавить канал для сообщений")
+async def add_channel(interaction: nextcord.Interaction, channel_id: str):
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
+        return
+    try:
+        channel_id = int(channel_id)
+        if channel_id in allowed_channels:
+            await interaction.response.send_message("Этот канал уже в списке, чел!")
+            return
+        allowed_channels.append(channel_id)
+        settings["allowed_channels"] = allowed_channels
+        save_settings(settings)
+        logger.info(f"Добавлен канал {channel_id} в разрешённые")
+        await interaction.response.send_message(f"Канал {channel_id} добавлен, теперь я там пишу!")
+    except ValueError:
+        await interaction.response.send_message("ID канала — это число, чел, проверь!")
+
+@client.slash_command(name="remove_channel", description="Убрать канал из разрешённых")
+async def remove_channel(interaction: nextcord.Interaction, channel_id: str):
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
+        return
+    try:
+        channel_id = int(channel_id)
+        if channel_id not in allowed_channels:
+            await interaction.response.send_message("Этого канала нет в списке, чел!")
+            return
+        allowed_channels.remove(channel_id)
+        settings["allowed_channels"] = allowed_channels
+        save_settings(settings)
+        logger.info(f"Удалён канал {channel_id} из разрешённых")
+        await interaction.response.send_message(f"Канал {channel_id} убран, там больше не пишу!")
+    except ValueError:
+        await interaction.response.send_message("ID канала — это число, чел, проверь!")
+
+@client.slash_command(name="list_settings", description="Показать текущие настройки")
+async def list_settings(interaction: nextcord.Interaction):
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
+        return
+    guilds = ", ".join(map(str, allowed_guilds))
+    channels = ", ".join(map(str, allowed_channels))
+    await interaction.response.send_message(f"Разрешённые сервера: {guilds}\nРазрешённые каналы: {channels}")
+
 @client.slash_command(name="sync", description="Синхронизировать команды")
 async def sync(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     await client.sync_all_application_commands()
-    logger.info("Команды синхронизированы для сервера P4P")
+    logger.info("Команды синхронизированы")
     await interaction.response.send_message("Команды синхронизированы, чел!")
 
 @client.slash_command(name="help", description="Список команд")
 async def help(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     commands = (
         "/ник - Дерзкий ник\n"
@@ -236,6 +307,9 @@ async def help(interaction: nextcord.Interaction):
         "/pcat <category> - Стиль из категорий\n"
         "/preset - Сброс стиля\n"
         "/pcust <prompt> - Свой стиль\n"
+        "/add_channel <channel_id> - Добавить канал\n"
+        "/remove_channel <channel_id> - Убрать канал\n"
+        "/list_settings - Показать настройки\n"
         "/sync - Синхронизация команд\n"
         "/help - Этот список"
     )
@@ -243,8 +317,8 @@ async def help(interaction: nextcord.Interaction):
 
 @client.slash_command(name="status", description="Статус бота")
 async def status(interaction: nextcord.Interaction):
-    if interaction.guild.id != GUILD_ID:
-        await interaction.response.send_message("Работаю только на P4P, чел!")
+    if interaction.guild.id not in allowed_guilds:
+        await interaction.response.send_message("Работаю только в разрешённых серверах, чел!")
         return
     queue = f"Очередь: {len(music_queue)} треков" if music_queue else "Очередь пуста"
     style = f"Стиль: {current_style[:30]}..." if len(current_style) > 30 else f"Стиль: {current_style}"
@@ -254,16 +328,22 @@ async def status(interaction: nextcord.Interaction):
 async def on_ready():
     logger.info(f'Бот {client.user} запущен!')
     try:
-        await client.sync_all_application_commands()  # Глобальная синхронизация
-        logger.info("Слэш-команды синхронизированы для P4P")
+        await client.sync_all_application_commands()
+        logger.info("Слэш-команды успешно синхронизированы")
     except Exception as e:
-        logger.error(f"Ошибка синхронизации: {str(e)}")
+        logger.error(f"Ошибка синхронизации команд: {str(e)}")
 
 @client.event
 async def on_message(message):
     if message.author == client.user or message.author.bot:
         return
     if not message.content.startswith('/'):
+        if message.guild is None or message.guild.id not in allowed_guilds:
+            logger.info(f"Сообщение игнорируется: сервер {message.guild.id if message.guild else 'None'} не в allowed_guilds")
+            return
+        if message.channel.id not in allowed_channels:
+            logger.info(f"Сообщение игнорируется: канал {message.channel.id} не в allowed_channels")
+            return
         ai_response = await get_ai_response(message.content, current_style)
         await message.channel.send(ai_response)
 
